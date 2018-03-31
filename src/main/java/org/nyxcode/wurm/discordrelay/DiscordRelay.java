@@ -24,14 +24,13 @@ import java.util.Arrays;
 import java.util.Date;
 import java.util.List;
 import java.util.Properties;
-import java.util.logging.Logger;
 
 
 /**
  * Created by whisper2shade on 22.04.2017.
  */
 public class DiscordRelay extends ListenerAdapter implements WurmServerMod, PreInitable, Configurable, ChannelMessageListener, PlayerMessageListener {
-    public static final Logger logger = Logger.getLogger(DiscordRelay.class.getName());
+    //public static final Logger logger = Logger.getLogger(DiscordRelay.class.getName());
 
     private static JDA jda;
     private static String botToken;
@@ -43,11 +42,7 @@ public class DiscordRelay extends ListenerAdapter implements WurmServerMod, PreI
     public void preInit() {
         try {
             jda = new JDABuilder(AccountType.BOT).setToken(botToken).addEventListener(this).buildBlocking();
-        } catch (LoginException e) {
-            e.printStackTrace();
-        } catch (InterruptedException e) {
-            e.printStackTrace();
-        } catch (RateLimitedException e) {
+        } catch (LoginException | RateLimitedException | InterruptedException e) {
             e.printStackTrace();
         }
     }
@@ -86,7 +81,7 @@ public class DiscordRelay extends ListenerAdapter implements WurmServerMod, PreI
     }
 
     public void sendToGlobalKingdomChat(final String channel, final String message) {
-        List<Kingdom> kingdoms = Arrays.asList(Kingdoms.getAllKingdoms());
+        Kingdom[] kingdoms = Kingdoms.getAllKingdoms();
 
         byte kingdomId = -1;
 
