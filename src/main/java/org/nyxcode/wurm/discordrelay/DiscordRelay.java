@@ -20,17 +20,16 @@ import org.gotti.wurmunlimited.modloader.interfaces.*;
 import javax.security.auth.login.LoginException;
 import java.text.DateFormat;
 import java.text.SimpleDateFormat;
-import java.util.Arrays;
 import java.util.Date;
-import java.util.List;
 import java.util.Properties;
+import java.util.logging.Logger;
 
 
 /**
  * Created by whisper2shade on 22.04.2017.
  */
 public class DiscordRelay extends ListenerAdapter implements WurmServerMod, PreInitable, Configurable, ChannelMessageListener, PlayerMessageListener {
-    //public static final Logger logger = Logger.getLogger(DiscordRelay.class.getName());
+    public static final Logger logger = Logger.getLogger(DiscordRelay.class.getName());
 
     private static JDA jda;
     private static String botToken;
@@ -75,6 +74,11 @@ public class DiscordRelay extends ListenerAdapter implements WurmServerMod, PreI
 
 	        builder.append(message.getMessage());
 	        jda.getGuildsByName(serverName, true).get(0).getTextChannelsByName(kingdomName, true).get(0).sendMessage(builder.build()).queue();*/
+        }else{
+            byte kingdomId = message.getSender().getKingdomId();
+            //Kingdom kingdom = Kingdoms.getKingdom(kingdomId);
+            String kingdomName = discordifyName(Kingdoms.getChatNameFor(kingdomId));
+            sendToDiscord(kingdomName, message.getMessage());
         }
 
         return MessagePolicy.PASS;
@@ -84,17 +88,32 @@ public class DiscordRelay extends ListenerAdapter implements WurmServerMod, PreI
         Kingdom[] kingdoms = Kingdoms.getAllKingdoms();
 
         byte kingdomId = -1;
+        boolean global = false;
 
         for (Kingdom kingdom : kingdoms) {
             if (discordifyName("GL-"+Kingdoms.getChatNameFor(kingdom.getId())).equals(channel.toLowerCase())) {
                 kingdomId = kingdom.getId();
+                global = true;
+                break;
+            }else if(discordifyName(Kingdoms.getChatNameFor(kingdom.getId())).equals(channel.toLowerCase())){
+                kingdomId = kingdom.getId();
+                global = false;
+                break;
             }
         }
         if (kingdomId != -1) {
             //long wurmId = -10;
 
-            final Message mess = new Message(null, Message.GLOBKINGDOM, "GL-"+Kingdoms.getChatNameFor(kingdomId), "[D] "//"<" + wurmBotName + "> "
-                    + message);
+            byte messageType = global ? Message.GLOBKINGDOM : Message.KINGDOM;
+            messageType = Message.GLOBKINGDOM;
+            String window = "";
+            if(global){
+                window = window + "GL-";
+            }
+            window = window + Kingdoms.getChatNameFor(kingdomId);
+            logger.info("Window = "+window);
+
+            final Message mess = new Message(null, messageType, window, message);
             mess.setSenderKingdom(kingdomId);
             if (message.trim().length() > 1) {
                 Server.getInstance().addMessage(mess);
@@ -127,7 +146,7 @@ public class DiscordRelay extends ListenerAdapter implements WurmServerMod, PreI
         super.onMessageReceived(event);
         if (event.isFromType(ChannelType.TEXT) && !event.getAuthor().isBot()) {
             String name = event.getTextChannel().getName();
-            sendToGlobalKingdomChat(name, "<" + event.getMember().getNickname() + "> " + event.getMessage().getContent());
+            sendToGlobalKingdomChat(name, "<@" + event.getMember().getEffectiveName() + "> " + event.getMessage().getContent());
         }
     }
 
@@ -142,9 +161,8 @@ public class DiscordRelay extends ListenerAdapter implements WurmServerMod, PreI
 
     @Override
     public MessagePolicy onPlayerMessage(Communicator communicator, String message, String title){
-        if(title.equals("Trade")){
-
-        }
+        /*if(title.equals("Trade")){
+        }*/
         return MessagePolicy.PASS;
     }
 

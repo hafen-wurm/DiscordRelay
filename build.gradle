@@ -31,6 +31,10 @@ dependencies {
     compile 'org.gotti.wurmunlimited:server-modlauncher:0.33-beta1'
 }
 
+jar {
+    version = null
+}
+
 shadowJar {
     dependencies {
         exclude(dependency('org.gotti.wurmunlimited:server-modlauncher:0.33-beta1'))
