@@ -1,20 +1,30 @@
 package org.nyxcode.wurm.discordrelay;
 
 import com.wurmonline.server.Message;
+import com.wurmonline.server.Players;
 import com.wurmonline.server.Server;
+import com.wurmonline.server.Servers;
 import com.wurmonline.server.creatures.Communicator;
+import com.wurmonline.server.creatures.Creature;
 import com.wurmonline.server.kingdom.Kingdom;
 import com.wurmonline.server.kingdom.Kingdoms;
 import com.wurmonline.server.villages.PvPAlliance;
 import com.wurmonline.server.villages.Village;
+import javassist.ClassPool;
+import javassist.CtClass;
+import javassist.NotFoundException;
+import javassist.bytecode.Descriptor;
+import mod.sin.lib.Util;
 import net.dv8tion.jda.core.AccountType;
 import net.dv8tion.jda.core.JDA;
 import net.dv8tion.jda.core.JDABuilder;
 import net.dv8tion.jda.core.MessageBuilder;
 import net.dv8tion.jda.core.entities.ChannelType;
+import net.dv8tion.jda.core.entities.Game;
 import net.dv8tion.jda.core.events.message.MessageReceivedEvent;
 import net.dv8tion.jda.core.exceptions.RateLimitedException;
 import net.dv8tion.jda.core.hooks.ListenerAdapter;
+import org.gotti.wurmunlimited.modloader.classhooks.HookManager;
 import org.gotti.wurmunlimited.modloader.interfaces.*;
 
 import javax.security.auth.login.LoginException;
@@ -37,11 +47,46 @@ public class DiscordRelay extends ListenerAdapter implements WurmServerMod, PreI
     //private String wurmBotName;
     private boolean useUnderscore;
 
+
+    public static void sendRumour(Creature creature){
+        sendToDiscord("rumors", "Rumours of " + creature.getName() + " are starting to spread.", true);
+    }
+
     @Override
     public void preInit() {
+        ClassPool classPool = HookManager.getInstance().getClassPool();
+        Class<DiscordRelay> thisClass = DiscordRelay.class;
+
         try {
             jda = new JDABuilder(AccountType.BOT).setToken(botToken).addEventListener(this).buildBlocking();
         } catch (LoginException | RateLimitedException | InterruptedException e) {
+            e.printStackTrace();
+        }
+
+        // - Send rumour messages to discord - //
+        try {
+            CtClass ctCreature = classPool.get("com.wurmonline.server.creatures.Creature");
+            CtClass[] params1 = {
+                    CtClass.intType,
+                    CtClass.booleanType,
+                    CtClass.floatType,
+                    CtClass.floatType,
+                    CtClass.floatType,
+                    CtClass.intType,
+                    classPool.get("java.lang.String"),
+                    CtClass.byteType,
+                    CtClass.byteType,
+                    CtClass.byteType,
+                    CtClass.booleanType,
+                    CtClass.byteType,
+                    CtClass.intType
+            };
+            String desc1 = Descriptor.ofMethod(ctCreature, params1);
+            Util.setReason("Send rumour messages to Discord.");
+            String replace = "$proceed($$);"
+                    + DiscordRelay.class.getName()+".sendRumour(toReturn);";
+            Util.instrumentDescribed(thisClass, ctCreature, "doNew", desc1, "broadCastSafe", replace);
+        } catch (NotFoundException e) {
             e.printStackTrace();
         }
     }
@@ -55,12 +100,19 @@ public class DiscordRelay extends ListenerAdapter implements WurmServerMod, PreI
     }
 
     private static final DateFormat df = new SimpleDateFormat("HH:mm:ss");
-    public static void sendToDiscord(String channel, String message){
+    public static void sendToDiscord(String channel, String message, boolean includeMap){
         MessageBuilder builder = new MessageBuilder();
         message = "[" + df.format(new Date(System.currentTimeMillis())) + "] "+message; // Add timestamp
+        message = message + "(" + Servers.localServer.mapname + ")";
 
         builder.append(message);
-        jda.getGuildsByName(serverName, true).get(0).getTextChannelsByName(channel, true).get(0).sendMessage(builder.build()).queue();
+        try {
+            jda.getPresence().setGame(Game.of(Players.getInstance().getNumberOfPlayers() + " online!"));
+            jda.getGuildsByName(serverName, true).get(0).getTextChannelsByName(channel, true).get(0).sendMessage(builder.build()).queue();
+        }catch(Exception e){
+            e.printStackTrace();
+            logger.info("Discord Relay failure: #"+channel+" - "+message);
+        }
     }
 
     @Override
@@ -69,7 +121,7 @@ public class DiscordRelay extends ListenerAdapter implements WurmServerMod, PreI
             byte kingdomId = message.getSender().getKingdomId();
             //Kingdom kingdom = Kingdoms.getKingdom(kingdomId);
             String kingdomName = discordifyName("GL-"+Kingdoms.getChatNameFor(kingdomId));
-            sendToDiscord(kingdomName, message.getMessage());
+            sendToDiscord(kingdomName, message.getMessage(), false);
 	        /*MessageBuilder builder = new MessageBuilder();
 
 	        builder.append(message.getMessage());
@@ -78,7 +130,7 @@ public class DiscordRelay extends ListenerAdapter implements WurmServerMod, PreI
             byte kingdomId = message.getSender().getKingdomId();
             //Kingdom kingdom = Kingdoms.getKingdom(kingdomId);
             String kingdomName = discordifyName(Kingdoms.getChatNameFor(kingdomId));
-            sendToDiscord(kingdomName, message.getMessage());
+            sendToDiscord(kingdomName, message.getMessage(), false);
         }
 
         return MessagePolicy.PASS;
@@ -104,16 +156,13 @@ public class DiscordRelay extends ListenerAdapter implements WurmServerMod, PreI
         if (kingdomId != -1) {
             //long wurmId = -10;
 
-            byte messageType = global ? Message.GLOBKINGDOM : Message.KINGDOM;
-            messageType = Message.GLOBKINGDOM;
             String window = "";
             if(global){
                 window = window + "GL-";
             }
             window = window + Kingdoms.getChatNameFor(kingdomId);
-            logger.info("Window = "+window);
 
-            final Message mess = new Message(null, messageType, window, message);
+            final Message mess = new Message(null, Message.GLOBKINGDOM, window, message);
             mess.setSenderKingdom(kingdomId);
             if (message.trim().length() > 1) {
                 Server.getInstance().addMessage(mess);
