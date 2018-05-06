@@ -13,7 +13,7 @@ apply plugin: 'com.github.johnrengelman.shadow'
 
 group = 'org.nyxcode.wurm'
 
-version = '1.0'
+version = '2.0'
 
 description = "A mod that acts as a discord relay between Wurm kingdom chat and a discord server"
 
@@ -29,8 +29,8 @@ repositories {
 }
 dependencies {
     compile 'net.dv8tion:JDA:3.3.1_289'
-    compile 'org.gotti.wurmunlimited:server-modlauncher:0.33-beta1'
-    compile 'com.github.Sindusk:sindusklibrary:v1.0'
+    compile 'org.gotti.wurmunlimited:server-modlauncher:0.35-beta1'
+    compile 'com.github.Sindusk:sindusklibrary:v1.1'
 }
 
 jar {
@@ -39,7 +39,7 @@ jar {
 
 shadowJar {
     dependencies {
-        exclude(dependency('org.gotti.wurmunlimited:server-modlauncher:0.33-beta1'))
+        exclude(dependency('org.gotti.wurmunlimited:server-modlauncher:0.35-beta1'))
         exclude(dependency('org.gotti.wurmunlimited:common:2182584'))
         exclude(dependency('org.gotti.wurmunlimited:server:2182584'))
     }

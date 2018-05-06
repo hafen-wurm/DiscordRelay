@@ -1,9 +1,6 @@
 package org.nyxcode.wurm.discordrelay;
 
-import com.wurmonline.server.Message;
-import com.wurmonline.server.Players;
-import com.wurmonline.server.Server;
-import com.wurmonline.server.Servers;
+import com.wurmonline.server.*;
 import com.wurmonline.server.creatures.Communicator;
 import com.wurmonline.server.creatures.Creature;
 import com.wurmonline.server.kingdom.Kingdom;
@@ -38,18 +35,23 @@ import java.util.logging.Logger;
 /**
  * Created by whisper2shade on 22.04.2017.
  */
-public class DiscordRelay extends ListenerAdapter implements WurmServerMod, PreInitable, Configurable, ChannelMessageListener, PlayerMessageListener {
+public class DiscordRelay extends ListenerAdapter implements WurmServerMod, PreInitable, Configurable, ServerPollListener, ChannelMessageListener, PlayerMessageListener {
     public static final Logger logger = Logger.getLogger(DiscordRelay.class.getName());
 
-    private static JDA jda;
-    private static String botToken;
-    private static String serverName;
+    protected static JDA jda;
+    protected static String botToken = "";
+    protected static String serverName = "";
     //private String wurmBotName;
-    private boolean useUnderscore;
+    protected static boolean useUnderscore = false;
+    protected static boolean showConnectedPlayers = true;
+    protected static int connectedPlayerUpdateInterval = 120;
+    protected static boolean enableRumors = true;
+    protected static String rumorChannel = "rumors";
+    protected static boolean enableTrade = true;
 
 
     public static void sendRumour(Creature creature){
-        sendToDiscord("rumors", "Rumours of " + creature.getName() + " are starting to spread.", true);
+        sendToDiscord(rumorChannel, "Rumours of " + creature.getName() + " are starting to spread.", true);
     }
 
     @Override
@@ -65,27 +67,29 @@ public class DiscordRelay extends ListenerAdapter implements WurmServerMod, PreI
 
         // - Send rumour messages to discord - //
         try {
-            CtClass ctCreature = classPool.get("com.wurmonline.server.creatures.Creature");
-            CtClass[] params1 = {
-                    CtClass.intType,
-                    CtClass.booleanType,
-                    CtClass.floatType,
-                    CtClass.floatType,
-                    CtClass.floatType,
-                    CtClass.intType,
-                    classPool.get("java.lang.String"),
-                    CtClass.byteType,
-                    CtClass.byteType,
-                    CtClass.byteType,
-                    CtClass.booleanType,
-                    CtClass.byteType,
-                    CtClass.intType
-            };
-            String desc1 = Descriptor.ofMethod(ctCreature, params1);
-            Util.setReason("Send rumour messages to Discord.");
-            String replace = "$proceed($$);"
-                    + DiscordRelay.class.getName()+".sendRumour(toReturn);";
-            Util.instrumentDescribed(thisClass, ctCreature, "doNew", desc1, "broadCastSafe", replace);
+            if(enableRumors) {
+                CtClass ctCreature = classPool.get("com.wurmonline.server.creatures.Creature");
+                CtClass[] params1 = {
+                        CtClass.intType,
+                        CtClass.booleanType,
+                        CtClass.floatType,
+                        CtClass.floatType,
+                        CtClass.floatType,
+                        CtClass.intType,
+                        classPool.get("java.lang.String"),
+                        CtClass.byteType,
+                        CtClass.byteType,
+                        CtClass.byteType,
+                        CtClass.booleanType,
+                        CtClass.byteType,
+                        CtClass.intType
+                };
+                String desc1 = Descriptor.ofMethod(ctCreature, params1);
+                Util.setReason("Send rumour messages to Discord.");
+                String replace = "$proceed($$);"
+                        + DiscordRelay.class.getName() + ".sendRumour(toReturn);";
+                Util.instrumentDescribed(thisClass, ctCreature, "doNew", desc1, "broadCastSafe", replace);
+            }
         } catch (NotFoundException e) {
             e.printStackTrace();
         }
@@ -93,21 +97,33 @@ public class DiscordRelay extends ListenerAdapter implements WurmServerMod, PreI
 
     @Override
     public void configure(Properties properties) {
-        botToken = properties.getProperty("botToken");
-        serverName = properties.getProperty("discordServerName");
-        //wurmBotName = properties.getProperty("wurmBotName");
-        useUnderscore = Boolean.parseBoolean(properties.getProperty("useUnderscore", "false"));
+        botToken = properties.getProperty("botToken", botToken);
+        if(botToken.equals("")){
+            logger.warning("Discord bot token not entered for DiscordRelay. The bot will not function without this.");
+        }
+        serverName = properties.getProperty("discordServerName", serverName);
+        if(serverName.equals("")){
+            logger.warning("Server name not entered for DiscordRelay. The bot will not function without this.");
+        }
+        useUnderscore = Boolean.parseBoolean(properties.getProperty("useUnderscore", Boolean.toString(useUnderscore)));
+        showConnectedPlayers = Boolean.parseBoolean(properties.getProperty("showConnectedPlayers", Boolean.toString(showConnectedPlayers)));
+        connectedPlayerUpdateInterval = Integer.parseInt(properties.getProperty("connectedPlayerUpdateInterval", Integer.toString(connectedPlayerUpdateInterval)));
+        pollPlayerInterval = TimeConstants.SECOND_MILLIS*connectedPlayerUpdateInterval;
+        enableRumors = Boolean.parseBoolean(properties.getProperty("enableRumors", Boolean.toString(enableRumors)));
+        rumorChannel = properties.getProperty("rumorChannel", rumorChannel);
+        enableTrade = Boolean.parseBoolean(properties.getProperty("enableTrade", Boolean.toString(enableTrade)));
     }
 
     private static final DateFormat df = new SimpleDateFormat("HH:mm:ss");
     public static void sendToDiscord(String channel, String message, boolean includeMap){
         MessageBuilder builder = new MessageBuilder();
         message = "[" + df.format(new Date(System.currentTimeMillis())) + "] "+message; // Add timestamp
-        message = message + "(" + Servers.localServer.mapname + ")";
+        if(includeMap) {
+            message = message + " (" + Servers.localServer.mapname + ")";
+        }
 
         builder.append(message);
         try {
-            jda.getPresence().setGame(Game.of(Players.getInstance().getNumberOfPlayers() + " online!"));
             jda.getGuildsByName(serverName, true).get(0).getTextChannelsByName(channel, true).get(0).sendMessage(builder.build()).queue();
         }catch(Exception e){
             e.printStackTrace();
@@ -117,7 +133,12 @@ public class DiscordRelay extends ListenerAdapter implements WurmServerMod, PreI
 
     @Override
     public MessagePolicy onKingdomMessage(Message message) {
-        if(message.getWindow().startsWith("GL-")){
+        String window = message.getWindow();
+        if(window.startsWith("Trade")){
+            if(enableTrade) {
+                sendToDiscord("trade", message.getMessage(), false);
+            }
+        }else if(window.startsWith("GL-")){
             byte kingdomId = message.getSender().getKingdomId();
             //Kingdom kingdom = Kingdoms.getKingdom(kingdomId);
             String kingdomName = discordifyName("GL-"+Kingdoms.getChatNameFor(kingdomId));
@@ -134,6 +155,15 @@ public class DiscordRelay extends ListenerAdapter implements WurmServerMod, PreI
         }
 
         return MessagePolicy.PASS;
+    }
+
+    public void sendToTradeChat(final String channel, final String message){
+        String window = "Trade";
+        final Message mess = new Message(null, Message.TRADE, window, message);
+        mess.setSenderKingdom((byte) 4);
+        if (message.trim().length() > 1) {
+            Server.getInstance().addMessage(mess);
+        }
     }
 
     public void sendToGlobalKingdomChat(final String channel, final String message) {
@@ -166,16 +196,6 @@ public class DiscordRelay extends ListenerAdapter implements WurmServerMod, PreI
             mess.setSenderKingdom(kingdomId);
             if (message.trim().length() > 1) {
                 Server.getInstance().addMessage(mess);
-                /*final WcKingdomChat wc = new WcKingdomChat(WurmId.getNextWCCommandId(),
-                        wurmId, "[D]", message, false, kingdomId,
-                        -1,
-                        -1,
-                        -1);*/
-                /*if (Servers.localServer.LOGINSERVER){
-                    wc.sendFromLoginServer();
-                }*/
-                //else
-                //wc.sendToLoginServer();
             }
         }
     }
@@ -195,7 +215,13 @@ public class DiscordRelay extends ListenerAdapter implements WurmServerMod, PreI
         super.onMessageReceived(event);
         if (event.isFromType(ChannelType.TEXT) && !event.getAuthor().isBot()) {
             String name = event.getTextChannel().getName();
-            sendToGlobalKingdomChat(name, "<@" + event.getMember().getEffectiveName() + "> " + event.getMessage().getContent());
+            if(name.contains("trade")){
+                if(enableTrade) {
+                    sendToTradeChat(name, "<@" + event.getMember().getEffectiveName() + "> " + event.getMessage().getContent());
+                }
+            }else {
+                sendToGlobalKingdomChat(name, "<@" + event.getMember().getEffectiveName() + "> " + event.getMessage().getContent());
+            }
         }
     }
 
@@ -218,5 +244,24 @@ public class DiscordRelay extends ListenerAdapter implements WurmServerMod, PreI
     @Override
     public boolean onPlayerMessage(Communicator var1, String var2) {
         return false;
+    }
+
+    protected static long lastPolledPlayers = 0;
+    protected static long pollPlayerInterval = TimeConstants.SECOND_MILLIS*120;
+    @Override
+    public void onServerPoll() {
+        if(showConnectedPlayers) {
+            if(System.currentTimeMillis() > lastPolledPlayers + pollPlayerInterval) {
+                if (Servers.localServer.LOGINSERVER) {
+                    try {
+                        jda.getPresence().setGame(Game.of(Players.getInstance().getNumberOfPlayers() + " online!"));
+                    }catch(Exception e){
+                        e.printStackTrace();
+                        logger.info("Failed to update player count.");
+                    }
+                }
+                lastPolledPlayers = System.currentTimeMillis();
+            }
+        }
     }
 }
