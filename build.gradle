@@ -13,7 +13,7 @@ apply plugin: 'com.github.johnrengelman.shadow'
 
 group = 'org.nyxcode.wurm'
 
-version = '2.1'
+version = '3.0'
 
 description = "A mod that acts as a discord relay between Wurm kingdom chat and a discord server"
 
@@ -23,14 +23,15 @@ targetCompatibility = 1.8
 repositories {
     mavenCentral()
     maven { url "http://jcenter.bintray.com" }
-    maven { url "http://gotti.no-ip.org/maven/repository" }
+    maven { url "https://dl.bdew.net/agorepo/" }
     maven { url "http://repo.maven.apache.org/maven2" }
     maven { url 'https://jitpack.io' }
 }
+
 dependencies {
     compile 'net.dv8tion:JDA:3.3.1_289'
-    compile 'org.gotti.wurmunlimited:server-modlauncher:0.35-beta1'
-    compile 'com.github.Sindusk:sindusklibrary:v1.1'
+    compile 'org.gotti.wurmunlimited:server-modlauncher:0.40'
+    compile 'com.github.Sindusk:sindusklibrary:v2.1'
 }
 
 jar {
@@ -39,9 +40,9 @@ jar {
 
 shadowJar {
     dependencies {
-        exclude(dependency('org.gotti.wurmunlimited:server-modlauncher:0.35-beta1'))
-        exclude(dependency('org.gotti.wurmunlimited:common:2182584'))
-        exclude(dependency('org.gotti.wurmunlimited:server:2182584'))
+        exclude(dependency('org.gotti.wurmunlimited:server-modlauncher:0.40'))
+        exclude(dependency('org.gotti.wurmunlimited:common:3127452'))
+        exclude(dependency('org.gotti.wurmunlimited:server:3127452'))
     }
 }
 

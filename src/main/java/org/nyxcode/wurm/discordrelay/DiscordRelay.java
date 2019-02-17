@@ -11,6 +11,7 @@ import javassist.ClassPool;
 import javassist.CtClass;
 import javassist.NotFoundException;
 import javassist.bytecode.Descriptor;
+import mod.sin.lib.Prop;
 import mod.sin.lib.Util;
 import net.dv8tion.jda.core.AccountType;
 import net.dv8tion.jda.core.JDA;
@@ -48,7 +49,8 @@ public class DiscordRelay extends ListenerAdapter implements WurmServerMod, PreI
     protected static boolean enableRumors = true;
     protected static String rumorChannel = "rumors";
     protected static boolean enableTrade = true;
-
+    protected static boolean enableMGMT = true;
+    protected static boolean enableCAHELP = true;
 
     public static void sendRumour(Creature creature){
         sendToDiscord(rumorChannel, "Rumours of " + creature.getName() + " are starting to spread.", true);
@@ -97,6 +99,8 @@ public class DiscordRelay extends ListenerAdapter implements WurmServerMod, PreI
 
     @Override
     public void configure(Properties properties) {
+        Prop.properties = properties;
+
         botToken = properties.getProperty("botToken", botToken);
         if(botToken.equals("")){
             logger.warning("Discord bot token not entered for DiscordRelay. The bot will not function without this.");
@@ -112,6 +116,8 @@ public class DiscordRelay extends ListenerAdapter implements WurmServerMod, PreI
         enableRumors = Boolean.parseBoolean(properties.getProperty("enableRumors", Boolean.toString(enableRumors)));
         rumorChannel = properties.getProperty("rumorChannel", rumorChannel);
         enableTrade = Boolean.parseBoolean(properties.getProperty("enableTrade", Boolean.toString(enableTrade)));
+        enableMGMT = Prop.getBooleanProperty("enableMGMT", enableMGMT);
+        enableCAHELP = Prop.getBooleanProperty("enableCAHELP", enableCAHELP);
     }
 
     private static final DateFormat df = new SimpleDateFormat("HH:mm:ss");
@@ -155,6 +161,24 @@ public class DiscordRelay extends ListenerAdapter implements WurmServerMod, PreI
         }
 
         return MessagePolicy.PASS;
+    }
+
+    public void sendToHelpChat(final String channel, final String message){
+        String window = "CA HELP";
+        final Message mess = new Message(null, Message.CA, window, message);
+        mess.setSenderKingdom((byte) 4);
+        if (message.trim().length() > 1) {
+            Server.getInstance().addMessage(mess);
+        }
+    }
+
+    public void sendToMGMTChat(final String channel, final String message){
+        String window = "MGMT";
+        final Message mess = new Message(null, Message.MGMT, window, message);
+        mess.setSenderKingdom((byte) 4);
+        if (message.trim().length() > 1) {
+            Server.getInstance().addMessage(mess);
+        }
     }
 
     public void sendToTradeChat(final String channel, final String message){
@@ -219,7 +243,15 @@ public class DiscordRelay extends ListenerAdapter implements WurmServerMod, PreI
                 if(enableTrade) {
                     sendToTradeChat(name, "<@" + event.getMember().getEffectiveName() + "> " + event.getMessage().getContent());
                 }
-            }else {
+            } else if (name.contains(discordifyName("ca-help"))){
+                if (enableCAHELP) {
+                    sendToHelpChat(name, "<@" + event.getMember().getEffectiveName() + "> " + event.getMessage().getContent());
+                }
+            } else if (name.contains("mgmt")){
+                if (enableMGMT) {
+                    sendToMGMTChat(name, "<@" + event.getMember().getEffectiveName() + "> " + event.getMessage().getContent());
+                }
+            } else {
                 sendToGlobalKingdomChat(name, "<@" + event.getMember().getEffectiveName() + "> " + event.getMessage().getContent());
             }
         }
@@ -234,10 +266,25 @@ public class DiscordRelay extends ListenerAdapter implements WurmServerMod, PreI
         }
     }
 
+    protected static String getPlayerPrefix(Communicator comm){
+        if (comm.getPlayer() != null) {
+            return "<" + comm.getPlayer().getName() + "> ";
+        }
+        logger.warning("Could not find player for a communicator.");
+        return "<???>";
+    }
+
     @Override
     public MessagePolicy onPlayerMessage(Communicator communicator, String message, String title){
-        /*if(title.equals("Trade")){
-        }*/
+        // Skip commands
+        if (message.startsWith("!") || message.startsWith("/") || message.startsWith("#")){
+            return MessagePolicy.PASS;
+        }
+        if (title.equals("MGMT")){
+            sendToDiscord("mgmt", getPlayerPrefix(communicator) + message, false);
+        } else if (title.equals("CA HELP")) {
+            sendToDiscord(discordifyName("ca-help"), getPlayerPrefix(communicator) + message, false);
+        }
         return MessagePolicy.PASS;
     }
 
@@ -256,8 +303,8 @@ public class DiscordRelay extends ListenerAdapter implements WurmServerMod, PreI
                     try {
                         jda.getPresence().setGame(Game.of(Players.getInstance().getNumberOfPlayers() + " online!"));
                     }catch(Exception e){
-                        e.printStackTrace();
-                        logger.info("Failed to update player count.");
+                        //e.printStackTrace();
+                        //logger.info("Failed to update player count.");
                     }
                 }
                 lastPolledPlayers = System.currentTimeMillis();
