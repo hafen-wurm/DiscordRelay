@@ -13,15 +13,13 @@ import javassist.NotFoundException;
 import javassist.bytecode.Descriptor;
 import mod.sin.lib.Prop;
 import mod.sin.lib.Util;
-import net.dv8tion.jda.core.AccountType;
-import net.dv8tion.jda.core.JDA;
-import net.dv8tion.jda.core.JDABuilder;
-import net.dv8tion.jda.core.MessageBuilder;
-import net.dv8tion.jda.core.entities.ChannelType;
-import net.dv8tion.jda.core.entities.Game;
-import net.dv8tion.jda.core.events.message.MessageReceivedEvent;
-import net.dv8tion.jda.core.exceptions.RateLimitedException;
-import net.dv8tion.jda.core.hooks.ListenerAdapter;
+import net.dv8tion.jda.api.JDA;
+import net.dv8tion.jda.api.JDABuilder;
+import net.dv8tion.jda.api.MessageBuilder;
+import net.dv8tion.jda.api.entities.Activity;
+import net.dv8tion.jda.api.entities.ChannelType;
+import net.dv8tion.jda.api.events.message.MessageReceivedEvent;
+import net.dv8tion.jda.api.hooks.ListenerAdapter;
 import org.gotti.wurmunlimited.modloader.classhooks.HookManager;
 import org.gotti.wurmunlimited.modloader.interfaces.*;
 
@@ -62,8 +60,9 @@ public class DiscordRelay extends ListenerAdapter implements WurmServerMod, PreI
         Class<DiscordRelay> thisClass = DiscordRelay.class;
 
         try {
-            jda = new JDABuilder(AccountType.BOT).setToken(botToken).addEventListener(this).buildBlocking();
-        } catch (LoginException | RateLimitedException | InterruptedException e) {
+            jda = JDABuilder.createDefault(botToken).addEventListeners(this).build().awaitReady();
+
+        } catch (LoginException | InterruptedException e) {
             e.printStackTrace();
         }
 
@@ -241,18 +240,18 @@ public class DiscordRelay extends ListenerAdapter implements WurmServerMod, PreI
             String name = event.getTextChannel().getName();
             if(name.contains("trade")){
                 if(enableTrade) {
-                    sendToTradeChat(name, "<@" + event.getMember().getEffectiveName() + "> " + event.getMessage().getContent());
+                    sendToTradeChat(name, "<@" + event.getMember().getEffectiveName() + "> " + event.getMessage().getContentRaw());
                 }
             } else if (name.contains(discordifyName("ca-help"))){
                 if (enableCAHELP) {
-                    sendToHelpChat(name, "<@" + event.getMember().getEffectiveName() + "> " + event.getMessage().getContent());
+                    sendToHelpChat(name, "<@" + event.getMember().getEffectiveName() + "> " + event.getMessage().getContentRaw());
                 }
             } else if (name.contains("mgmt")){
                 if (enableMGMT) {
-                    sendToMGMTChat(name, "<@" + event.getMember().getEffectiveName() + "> " + event.getMessage().getContent());
+                    sendToMGMTChat(name, "<@" + event.getMember().getEffectiveName() + "> " + event.getMessage().getContentRaw());
                 }
             } else {
-                sendToGlobalKingdomChat(name, "<@" + event.getMember().getEffectiveName() + "> " + event.getMessage().getContent());
+                sendToGlobalKingdomChat(name, "<@" + event.getMember().getEffectiveName() + "> " + event.getMessage().getContentRaw());
             }
         }
     }
@@ -301,7 +300,7 @@ public class DiscordRelay extends ListenerAdapter implements WurmServerMod, PreI
             if(System.currentTimeMillis() > lastPolledPlayers + pollPlayerInterval) {
                 if (Servers.localServer.LOGINSERVER) {
                     try {
-                        jda.getPresence().setGame(Game.of(Players.getInstance().getNumberOfPlayers() + " online!"));
+                        jda.getPresence().setActivity(Activity.of(Activity.ActivityType.CUSTOM_STATUS, Players.getInstance().getNumberOfPlayers() + " online!"));
                     }catch(Exception e){
                         //e.printStackTrace();
                         //logger.info("Failed to update player count.");
