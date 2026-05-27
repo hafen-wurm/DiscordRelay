@@ -1,13 +1,10 @@
-plugins{
+plugins {
+    id 'java'
     id 'maven-publish'
     id 'com.github.johnrengelman.shadow' version '7.1.2'
 }
-apply plugin: 'java'
-apply plugin: 'com.github.johnrengelman.shadow'
-
 
 group = findProperty('group') ?: 'org.nyxcode.wurm'
-
 version = findProperty('version') ?: '3.2'
 
 description = "A mod that acts as a discord relay between Wurm kingdom chat and a discord server"
@@ -16,7 +13,6 @@ java {
     sourceCompatibility = JavaVersion.VERSION_1_8
     targetCompatibility = JavaVersion.VERSION_1_8
 }
-
 
 repositories {
     mavenCentral()
@@ -43,14 +39,20 @@ shadowJar {
     archiveFileName = "${project.name}.jar"
 }
 
-task dist(type: Zip) {
-    into("mods", {
-        into(project.name, {
+tasks.register('dist', Zip) {
+    into("mods") {
+        into(project.name) {
             from shadowJar
-        })
-
+        }
         from fileTree(dir: 'mods', include: '*')
-    })
-
+    }
     archiveFileName = "${project.name}-${project.version}.zip"
+}
+
+publishing {
+    publications {
+        maven(MavenPublication) {
+            from components.java
+        }
+    }
 }
