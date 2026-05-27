@@ -6,9 +6,9 @@ apply plugin: 'java'
 apply plugin: 'com.github.johnrengelman.shadow'
 
 
-group = 'org.nyxcode.wurm'
+group = findProperty('group') ?: 'org.nyxcode.wurm'
 
-version = '3.2'
+version = findProperty('version') ?: '3.2'
 
 description = "A mod that acts as a discord relay between Wurm kingdom chat and a discord server"
 
