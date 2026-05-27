@@ -15,11 +15,11 @@ import mod.sin.lib.Prop;
 import mod.sin.lib.Util;
 import net.dv8tion.jda.api.JDA;
 import net.dv8tion.jda.api.JDABuilder;
-import net.dv8tion.jda.api.MessageBuilder;
 import net.dv8tion.jda.api.entities.Activity;
-import net.dv8tion.jda.api.entities.ChannelType;
+import net.dv8tion.jda.api.entities.channel.ChannelType;
 import net.dv8tion.jda.api.events.message.MessageReceivedEvent;
 import net.dv8tion.jda.api.hooks.ListenerAdapter;
+import net.dv8tion.jda.api.utils.messages.MessageCreateBuilder;
 import org.gotti.wurmunlimited.modloader.classhooks.HookManager;
 import org.gotti.wurmunlimited.modloader.interfaces.*;
 
@@ -62,7 +62,7 @@ public class DiscordRelay extends ListenerAdapter implements WurmServerMod, PreI
         try {
             jda = JDABuilder.createDefault(botToken).addEventListeners(this).build().awaitReady();
 
-        } catch (LoginException | InterruptedException e) {
+        } catch (InterruptedException e) {
             e.printStackTrace();
         }
 
@@ -121,13 +121,13 @@ public class DiscordRelay extends ListenerAdapter implements WurmServerMod, PreI
 
     private static final DateFormat df = new SimpleDateFormat("HH:mm:ss");
     public static void sendToDiscord(String channel, String message, boolean includeMap){
-        MessageBuilder builder = new MessageBuilder();
+        MessageCreateBuilder builder = new MessageCreateBuilder();
         message = "[" + df.format(new Date(System.currentTimeMillis())) + "] "+message; // Add timestamp
         if(includeMap) {
             message = message + " (" + Servers.localServer.mapname + ")";
         }
 
-        builder.append(message);
+        builder.addContent(message);
         try {
             jda.getGuildsByName(serverName, true).get(0).getTextChannelsByName(channel, true).get(0).sendMessage(builder.build()).queue();
         }catch(Exception e){
@@ -237,7 +237,7 @@ public class DiscordRelay extends ListenerAdapter implements WurmServerMod, PreI
     public void onMessageReceived(MessageReceivedEvent event) {
         super.onMessageReceived(event);
         if (event.isFromType(ChannelType.TEXT) && !event.getAuthor().isBot()) {
-            String name = event.getTextChannel().getName();
+            String name = event.getChannel().getName();
             if(name.contains("trade")){
                 if(enableTrade) {
                     sendToTradeChat(name, "<@" + event.getMember().getEffectiveName() + "> " + event.getMessage().getContentRaw());
